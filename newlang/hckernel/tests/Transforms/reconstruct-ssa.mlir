@@ -103,3 +103,40 @@ py_ir.module {
     py_ir.return %1 : none
   }
 }
+
+// -----
+
+// CHECK-LABEL: py_ir.module
+//       CHECK:  %{{.*}} = py_ir.func
+//       CHECK:    cf.br ^[[CONDBR:.*]](%{{.*}})
+//       CHECK:  ^[[CONDBR]](%[[BV1:.*]]: [[BV1T:.*]]):
+//       CHECK:    %[[COND:.*]] = py_ir.cast %[[BV1]] : [[BV1T]] to i1
+//       CHECK:    cf.cond_br %[[COND]], ^[[THENBR:.*]](%[[BV1]] : [[BV1T]]), ^[[ELSEBR:.*]]
+//       CHECK:  ^[[THENBR]](%[[BV2:.*]]: [[BV2T:.*]]):
+//       CHECK:    %[[R:.*]] = py_ir.binop %[[BV2]] : [[BV2T]] add {{.*}} -> [[RT:.*]]
+//       CHECK:    py_ir.storevar "A" %[[R]]
+//       CHECK:    cf.br ^[[CONDBR]](%[[R]] : [[RT]])
+//       CHECK:  ^[[ELSEBR]]:
+//       CHECK:    py_ir.return
+py_ir.module {
+  %0 = py_ir.constant 1 : i64
+  %1 = py_ir.func "func" -> !py_ir.undefined {
+    cf.br ^bb1
+  ^bb1:  // 2 preds: ^bb0, ^bb2
+    %4 = py_ir.loadvar "A" : !py_ir.undefined
+    %5 = py_ir.cast %4 : !py_ir.undefined to i1
+    cf.cond_br %5, ^bb2, ^bb3
+  ^bb2:  // pred: ^bb1
+    %6 = py_ir.loadvar "A" : !py_ir.undefined
+    %7 = py_ir.binop %6 : !py_ir.undefined add %0 : i64 -> !py_ir.undefined
+    py_ir.storevar "A" %7 : !py_ir.undefined
+    cf.br ^bb1
+  ^bb3:  // pred: ^bb1
+    %8 = py_ir.none
+    py_ir.return %8 : none
+  }
+  py_ir.storevar "foo" %1 : !py_ir.undefined
+  %2 = py_ir.loadvar "foo" : !py_ir.undefined
+  %3 = py_ir.call %2 : !py_ir.undefined  () -> !py_ir.undefined
+}
+

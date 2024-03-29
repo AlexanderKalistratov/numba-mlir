@@ -329,3 +329,38 @@ py_ast.module {
   %1 = py_ast.name "A"
   py_ast.aug_assign %1 add %0
 }
+
+// -----
+
+// CHECK-LABEL: py_ir.module
+//       CHECK:  %[[C1:.*]] = py_ir.constant 1 : [[C1T:.*]]
+//       CHECK:  py_ir.func "func"
+//       CHECK:  cf.br ^[[CONDBR:.*]]
+//       CHECK:  ^[[CONDBR]]:
+//       CHECK:  %[[A1:.*]] = py_ir.loadvar "A" : [[A1T:.*]]
+//       CHECK:  %[[COND:.*]] = py_ir.cast %[[A1]] : [[A1T]] to i1
+//       CHECK:  cf.cond_br %[[COND]], ^[[THENBR:.*]], ^[[ELSEBR:.*]]
+//       CHECK:  ^[[THENBR]]:
+//       CHECK:  %[[A2:.*]] = py_ir.loadvar "A" : [[A2T:.*]]
+//       CHECK:  %[[R:.*]] = py_ir.binop %[[A2]] : [[A2T]] add %[[C1]] : [[C1T]]
+//       CHECK:  py_ir.storevar "A" %[[R]]
+//       CHECK:  cf.br ^[[CONDBR]]
+//       CHECK:  ^[[ELSEBR]]:
+//       CHECK:  py_ir.return
+py_ast.module {
+  py_ast.func "func"() {
+    %2 = py_ast.name "A"
+    py_ast.while %2 {
+      %4 = py_ast.name "A"
+      %5 = py_ast.name "A"
+      %6 = py_ast.constant 1 : i64
+      %7 = py_ast.binop %5 add %6
+      py_ast.assign(%4) = %7
+    }
+    %3 = py_ast.constant #py_ast.none
+    py_ast.return %3
+  }
+  %0 = py_ast.name "func"
+  %1 = py_ast.call %0( keywords )
+  py_ast.expr %1
+}

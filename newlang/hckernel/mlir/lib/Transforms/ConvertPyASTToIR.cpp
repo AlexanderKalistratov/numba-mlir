@@ -337,6 +337,47 @@ public:
   }
 };
 
+class ConvertWhile final : public mlir::OpRewritePattern<hc::py_ast::WhileOp> {
+public:
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(hc::py_ast::WhileOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    if (!isTopLevel(op))
+      return mlir::failure();
+
+    mlir::Location loc = op.getLoc();
+
+    mlir::Block *beforeBlock = rewriter.getInsertionBlock();
+
+    auto opPosition = rewriter.getInsertionPoint();
+    auto *remainingOpsBlock = rewriter.splitBlock(beforeBlock, opPosition);
+
+    mlir::OpBuilder::InsertionGuard g(rewriter);
+    mlir::Block *condBlock = rewriter.createBlock(remainingOpsBlock);
+    rewriter.setInsertionPointToEnd(beforeBlock);
+    rewriter.create<mlir::cf::BranchOp>(loc, condBlock);
+
+    mlir::Block *thenBlock = &op.getBodyRegion().front();
+    rewriter.setInsertionPointToEnd(thenBlock);
+    rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(thenBlock->getTerminator(),
+                                                    condBlock);
+    rewriter.inlineRegionBefore(op.getBodyRegion(), remainingOpsBlock);
+
+    rewriter.setInsertionPointToEnd(condBlock);
+
+    mlir::Value cond = getVar(rewriter, loc, op.getTest());
+    cond = boolCast(rewriter, loc, cond);
+
+    rewriter.create<mlir::cf::CondBranchOp>(loc, cond, thenBlock,
+                                            remainingOpsBlock);
+    rewriter.eraseOp(op);
+
+    return mlir::success();
+  }
+};
+
 class ConvertAssign final
     : public mlir::OpRewritePattern<hc::py_ast::AssignOp> {
 public:
@@ -418,6 +459,6 @@ struct ConvertPyASTToIRPass final
 
 void hc::populateConvertPyASTToIRPatterns(mlir::RewritePatternSet &patterns) {
   patterns.insert<ConvertModule, ConvertFunc, ConvertReturn, ConvertIf,
-                  ConvertAssign, ConvertAugAssign, ConvertExpr>(
+                  ConvertWhile, ConvertAssign, ConvertAugAssign, ConvertExpr>(
       patterns.getContext());
 }
